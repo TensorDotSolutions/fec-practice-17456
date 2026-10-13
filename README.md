@@ -18,7 +18,7 @@ so training was always a Colab step; every other stage is CPU-bound and ran loca
 | Baselines (Ridge/RF/MLP) | local | fit on PCA-compressed ψ targets (`02`/`02b`/`02c`) |
 | **Conv-decoder training** | **Colab (GPU)** | train a PyTorch model that predicts ψ directly as an image, not PCA coefficients |
 | Scalar heads (q95/βN) | local | per-scalar RidgeCV (`03_train_scalars.py`) |
-| Local scoring | local | real composite scorer (pointwise R², LCFS consistency, etc.) against held-out shots |
+| Local scoring | local | real composite scorer (pointwise R², LCFS consistency, etc.) against held-out shots (`04_local_score.py`, ranked across every model with `04b_compare_models.py`) |
 | Challenge-2 (MAST, zero-shot) | local | shared-feature scalar head fit on DIII-D only |
 | Build submission | local or Colab | stream the public test splits from the Hub, run every shot through the trained models, write `.npz` |
 | Validate + push | local | run the official (vendored, unmodified) validator, then push to a private Hugging Face dataset repo |
@@ -43,12 +43,25 @@ that shape much better, but needs a GPU for the conv-transpose/upsample stack ov
 - `code/train_conv_decoder_full.ipynb` / `code/train_conv_decoder_v2.ipynb` — Colab notebooks
   that train the conv decoder (V1: ConvTranspose2d stack; V2: CoordConv + bilinear-upsample +
   residual blocks + boundary-weighted loss, aimed at the LCFS-contour shape scalars V1 was
-  weakest on) on the full train/val split.
+  weakest on) on the full train/val split. Both generated from the **same** template
+  (`notebook_builders/notebook-build_train_conv_decoder.py`'s `VARIANTS` list) -- adding another
+  architecture variant means adding one entry there, not writing a new near-duplicate notebook.
 - `code/validate_push.ipynb` — Colab variant of the local validate/push step, for when Colab's
   network path to the Hugging Face Hub is faster than the local connection.
 - `code/notebook_builders/notebook-build_*.py` — generators for every notebook above; notebooks are
   regenerated from these, never hand-edited.
 - `docs/` — vendored copies of the official starter kit's README and modeling guide.
+
+## Comparing models/architectures
+
+`code/artifacts/manifest.json` is the single source of truth for every trained model (name,
+checkpoint path, validation metric, timestamp); `code/artifacts/leaderboard.csv` is an
+append-only log of every real composite-score run `04_local_score.py` has produced. Run
+`04b_compare_models.py` for a ranked view of both instead of comparing numbers by hand:
+
+```
+uv run --python .venv code/run/04b_compare_models.py --best-only
+```
 
 ## Credentials
 
