@@ -1,0 +1,21 @@
+# Local (non-Colab) environment for the FEC pipeline.
+# uv-managed, isolated venv at the repo root:
+#   uv venv .venv --python 3.12
+#   uv pip install --python .venv -r code/requirements-local.txt
+numpy>=2.0
+pandas>=2.2
+pyarrow>=15
+scipy>=1.11
+scikit-learn==1.8.0
+joblib>=1.3
+matplotlib>=3.8
+huggingface_hub>=1.20.1
+python-dotenv>=1.2.2
+datasets>=3.0.0
+# Pinned to the scorer's own version: fusion_scoring/lcfs.py needs it for the
+# contour extraction behind the D_LCFS and Consistency terms of the metric.
+scikit-image==0.25.2
+optuna>=4.0
+# torch is NOT listed here on purpose -- the default PyPI wheel pulls CUDA deps unneeded for
+# CPU-only inference (predict.py loads conv-decoder checkpoints with it). Install separately:
+#   uv pip install --python .venv torch --index-url https://download.pytorch.org/whl/cpu

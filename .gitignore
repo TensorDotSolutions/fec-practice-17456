@@ -1,0 +1,22 @@
+# Local env & credentials
+code/.venv/
+code/.env
+.env
+
+# Heavy / regenerable data and clones (recreated by 00_setup.py / download_dataset.py)
+code/fusion-equilibrium-challenge/
+code/starter/
+code/artifacts/
+
+# Python debris
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Optional 32 GiB swapfile created by `00_setup.py --bump-swap`
+/swapfile_fec
+
+# Unrelated personal scratch files, not part of this project
+/openrouter_prices.py
+/openrouter_prices.xlsx
+*.ipynb_checkpoints
