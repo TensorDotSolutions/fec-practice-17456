@@ -14,7 +14,7 @@ Design notes
   manifest.json's model paths. Resolved here by basename, joined against the Drive-synced
   DATA_ROOT, exactly like _load_flux_model() now does for the flux joblib paths.
 * Split is BY SHOT (split.json's train/val/test shot ids), matching every other step in this
-  pipeline -- never split by frame/timestep (see CLAUDE.md).
+  pipeline -- never split by frame/timestep (see the project notes).
 * One epoch = one pass over all frames of all train shots, shot order shuffled each epoch,
   frames within a shot kept together per batch draw (frames are cheap once a shot is loaded;
   reloading a 65x65xT parquet row is the expensive part, so this script batches across shots'

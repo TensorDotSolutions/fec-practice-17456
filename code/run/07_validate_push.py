@@ -6,7 +6,7 @@
 
 Both subcommands shell out to the **unmodified** starter-kit CLIs
 (``validate_submission.py`` / ``push_predictions.py``), so what we check locally is
-what Codabench runs.  Pushing needs two different tokens (see CLAUDE.md): a write
+what Codabench runs.  Pushing needs two different tokens (see the project notes): a write
 token already logged in via ``huggingface-cli login`` for the upload, and a
 fine-grained read-only token passed with ``--read-token`` and shipped inside the zip.
 """
@@ -33,7 +33,7 @@ _SECRET_FLAGS = {"--read-token", "--token"}
 def _redact(cmd: list[str]) -> list[str]:
     """Replace the value right after any flag in _SECRET_FLAGS before this ever hits a log
     line -- a prior version logged the raw --read-token value in plaintext (see git history /
-    CLAUDE.md's Credentials section on why that token must not leak)."""
+    the project notes' Credentials section on why that token must not leak)."""
     out = list(cmd)
     for i, tok in enumerate(out):
         if tok in _SECRET_FLAGS and i + 1 < len(out):

@@ -176,8 +176,8 @@ come from the real composite scorer, which runs **locally**, not in Colab:
 uv run --python .venv code/run/04_local_score.py --model "Conv Decoder V2" --n-shots 50
 ```
 
-`flux_conv_decoder_v2.pt` needs registering in `manifest.json` under a model name first (ask
-Claude to wire this up once this checkpoint has synced back from Drive) -- then that command
+`flux_conv_decoder_v2.pt` needs registering in `manifest.json` under a model name first
+(wire this up once this checkpoint has synced back from Drive) -- then that command
 gives the real, comparable `S` / `consistency` numbers against V1's existing
 `S=0.9429` / `consistency=0.766` (n=50, in `code/artifacts/scores/local_score.json`)."""))
 

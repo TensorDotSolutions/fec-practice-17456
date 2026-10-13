@@ -8,7 +8,7 @@ Why this exists alongside 02_train_flux.py's "Ridge (CV)" baseline: that one is
 ``RidgeCV(alphas=np.logspace(-3, 3, 10))`` -- it cross-validates *within* the training rows
 using sklearn's generic K-fold, which mixes frames from different shots across folds. Every
 other step in this pipeline (02's own val split, 04's scoring) deliberately splits by shot, not
-by frame/timestep, because frames within one shot are highly correlated (see CLAUDE.md). This
+by frame/timestep, because frames within one shot are highly correlated (see the project notes). This
 script instead scores each Optuna trial against the *same* held-out val shots 02 and 04 use, so
 the alpha it picks is validated the same way the final model will be judged -- and widens the
 search beyond RidgeCV's fixed 10-point grid (alpha down to 1e-6, up to 1e4; both solvers that

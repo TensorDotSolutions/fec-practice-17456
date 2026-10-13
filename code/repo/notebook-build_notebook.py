@@ -1,7 +1,7 @@
 """Generates train_score_submit.ipynb.
 
 Heavy preprocessing and training (00_setup.py .. 05_train_challenge2.py) run LOCALLY against
-the fec_common package in code/run/ -- see CLAUDE.md. This repo folder is Insync-synced to
+the fec_common package in code/run/ -- see the project notes. This repo folder is Insync-synced to
 Google Drive, so everything those scripts write (code/artifacts/, code/fusion-equilibrium-
 challenge/data/, code/starter/) shows up on Drive without any extra upload step.
 
@@ -101,7 +101,7 @@ cells.append(code("!python {RUN_DIR}/06_build_submission.py"))
 cells.append(md("""## 2. Validate and push
 
 Validates structure with the vendored, unmodified `validate_submission.py`. Push needs **two**
-different Hugging Face tokens, easy to mix up (see `CLAUDE.md` → Credentials):
+different Hugging Face tokens, easy to mix up (see the project notes' Credentials section):
 
 - a **write** token, logged in once via `huggingface-cli login` (the cell below does this) —
   uploads the `.npz`, never leaves this runtime,

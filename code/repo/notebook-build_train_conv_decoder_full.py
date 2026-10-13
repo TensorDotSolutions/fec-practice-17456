@@ -140,7 +140,7 @@ cells.append(md("""---
   directly. Ask for that bridge once this checkpoint's val R2 looks competitive against the
   baselines plotted above.
 - If this run OOMs even at float16 storage, the `n_shots_train` would need to drop, or the
-  dataset would need to move off full-GPU-residency to a chunked/streaming load -- tell Claude
+  dataset would need to move off full-GPU-residency to a chunked/streaming load -- flag this
   if that happens."""))
 
 nb = {
