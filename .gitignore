@@ -20,3 +20,6 @@ __pycache__/
 /openrouter_prices.py
 /openrouter_prices.xlsx
 *.ipynb_checkpoints
+
+# Internal AI-assistant instructions, not meant for the public repo
+/CLAUDE.md
