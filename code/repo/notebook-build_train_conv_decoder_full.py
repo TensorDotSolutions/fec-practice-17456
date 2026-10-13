@@ -1,13 +1,13 @@
-"""Generates train_conv_decoder_full.ipynb -- the FULL-SPLIT conv-decoder training run.
+"""Generates train_conv_decoder_full.ipynb -- the FULL-SPLIT conv-decoder training run (V1
+architecture; see notebook-build_train_conv_decoder_v2.py for the V2 variant).
 
-Sibling of notebook-build_train_conv_decoder.py / train_conv_decoder.ipynb, meant to run as a
-SEPARATE Colab instance at the same time -- that one is for quick architecture iteration on a
-subsample (600-2000 shots), this one trains on the entire train/val split (4929/704 shots,
-matching exactly what the Ridge/RF/MLP baselines in manifest.json were trained on, so its
-val R2 is directly comparable to their 0.3967/0.7626/etc without a subsampling caveat).
+Trains on the entire train/val split (4929/704 shots, matching exactly what the Ridge/RF/MLP
+baselines in manifest.json were trained on, so its val R2 is directly comparable to their
+0.3967/0.7626/etc without a subsampling caveat).
 
-Writes its checkpoint to a DIFFERENT filename (flux_conv_decoder_full.pt, via train()'s
-checkpoint_name= param) so running both notebooks at once doesn't clobber either checkpoint.
+Writes its checkpoint to flux_conv_decoder_full.pt (via train()'s checkpoint_name= param) --
+V2's notebook writes to a different file, so both can run as separate Colab instances without
+clobbering each other.
 
 To change what this notebook does: edit fec_common/conv_decoder.py or
 fec_common/train_conv_decoder_colab.py (the actual logic), or this file, then regenerate:
@@ -27,14 +27,14 @@ cells = []
 
 cells.append(md("""# Fusion Equilibrium Challenge — Conv Decoder Training (FULL split, GPU)
 
-Same `PsiConvDecoder` as `train_conv_decoder.ipynb`, but trains on the **entire** train/val
-split (4929 train shots / 704 val shots) instead of a subsample -- matching exactly what the
-Ridge/Random Forest/MLP baselines in `manifest.json` were trained on, so this run's `val R2` is
-directly comparable to their 0.3967 / 0.7626 without a "but it only saw 40% of the data" caveat.
+Trains `PsiConvDecoder` (V1 architecture) on the **entire** train/val split (4929 train shots /
+704 val shots) -- matching exactly what the Ridge/Random Forest/MLP baselines in
+`manifest.json` were trained on, so this run's `val R2` is directly comparable to their
+0.3967 / 0.7626 without a "but it only saw 40% of the data" caveat.
 
-**Run this as a separate Colab instance from `train_conv_decoder.ipynb`** if you're iterating on
-architecture there at the same time -- this notebook writes its checkpoint to a different file
-(`flux_conv_decoder_full.pt`) so the two don't clobber each other.
+See `train_conv_decoder_v2.ipynb` for the V2 architecture (CoordConv + bilinear-upsample +
+residual blocks + boundary-weighted loss), which writes to a different checkpoint file, so both
+can run as separate Colab instances without clobbering each other.
 
 Needs a GPU with real headroom: ψ targets are stored float16 on-GPU (~9GB at this scale) --
 a 16GB+ card (T4/L4/A100) is required; this will not fit a small (<12GB) GPU at full scale.
