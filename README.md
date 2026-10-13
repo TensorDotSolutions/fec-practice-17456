@@ -46,7 +46,7 @@ that shape much better, but needs a GPU for the conv-transpose/upsample stack ov
   weakest on) on the full train/val split.
 - `code/validate_push.ipynb` — Colab variant of the local validate/push step, for when Colab's
   network path to the Hugging Face Hub is faster than the local connection.
-- `code/repo/notebook-build_*.py` — generators for every notebook above; notebooks are
+- `code/notebook_builders/notebook-build_*.py` — generators for every notebook above; notebooks are
   regenerated from these, never hand-edited.
 - `docs/` — vendored copies of the official starter kit's README and modeling guide.
 
