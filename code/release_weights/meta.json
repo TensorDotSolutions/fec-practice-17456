@@ -1,0 +1,20 @@
+{
+  "n_shots": 7041,
+  "n_frames": 1559340,
+  "n_feat": 149,
+  "n_magnetics": 21,
+  "n_thomson": 128,
+  "n_scalars": 6,
+  "include_thomson": true,
+  "n_dropped": 0,
+  "n_padded_shots": 6984,
+  "n_truncated_shots": 0,
+  "natural_width_max": 149,
+  "natural_width_min": 127,
+  "seed": 42,
+  "n_shots_requested": 0,
+  "pca_frames": 50031,
+  "pca_shots": 232,
+  "pca_variance": 0.9999998964327903,
+  "pca_components": 50
+}
