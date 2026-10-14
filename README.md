@@ -63,6 +63,27 @@ append-only log of every real composite-score run `04_local_score.py` has produc
 uv run --python .venv code/run/04b_compare_models.py --best-only
 ```
 
+## Known fixed bug: Challenge-2 (MAST) Ip unit mismatch
+
+The first scored submission's Challenge-2 (MAST, zero-shot) result was not just "weak transfer"
+— it was a genuine unit bug. `synthetic_features_for_shot` (in `fec_common/features.py`)
+assumed DIII-D's `magnetics_plasma_current` was already in amps (no conversion) and multiplied
+MAST's by 1000 assuming it was in kA needing conversion to A. Empirically, both machines' raw
+values are already in kA (DIII-D tops out ~1000-1700, i.e. ~1-1.7 MA; MAST tops out ~400-1000,
+matching MAST's known current range) — so the old code introduced a spurious ~1000x scale gap
+between the two machines' dominant shared feature. Fed through a `StandardScaler` fit only on
+DIII-D, MAST's Ip landed ~2500 standard deviations out of distribution, and a linear `RidgeCV`
+has no mechanism to saturate on that — it just extrapolates, which is exactly what produced
+R² in the hundreds-of-thousands-to-millions-negative range on the scored submission (not
+ordinary "bad transfer" noise).
+
+Fixed by removing both unit conversions (verified the gap collapses from ~2500σ to ~1.7σ after
+the fix). `fec_common/predict.py`'s `challenge2_predict` also now clamps its output to the
+physical range observed in DIII-D training data (`psi ∈ [-1.5, 1.5]`, `q95 ∈ [0, 40]`,
+`betaN ∈ [-1, 6]`) as cheap insurance against any future out-of-distribution blow-up from a
+linear model with no other guardrail — re-run `05_train_challenge2.py` after any change to
+`synthetic_features_for_shot`.
+
 ## Credentials
 
 Two different Hugging Face tokens are used and must not be confused: a **write** token (local

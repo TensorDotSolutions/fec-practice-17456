@@ -8,7 +8,17 @@ features) so it can transfer to MAST, where there is no training data at all.  T
 notebook's cell 20 left q95/betaN as zeros; this adds a RidgeCV scalar head on the
 same shared features, which is worth ~0.02 of the composite score when it works.
 
-Writes ``code/artifacts/models/ch2.joblib`` = {scaler, pca, model, scalar, meta}.
+Shape/amplitude split: the PCA is fit on each frame's psi *normalized by its own RMS*,
+not raw psi -- so the PCA basis models machine-agnostic flux-map SHAPE only, and a
+second RidgeCV head predicts the (log) amplitude scale separately from the same shared
+features. Fitting PCA+Ridge on raw-scale psi directly (the original version of this
+script) forced the shape basis to also absorb DIII-D's absolute psi magnitude, which
+transfers poorly to MAST (different machine size/field -> different ψ scale) and was
+part of why the first MAST submission scored catastrophically. Splitting the two lets
+the shape fit transfer on its own merits even when the amplitude fit is still weak.
+
+Writes ``code/artifacts/models/ch2.joblib`` =
+    {scaler, pca, model, amp_model, scalar, meta}.
 """
 from __future__ import annotations
 
@@ -38,11 +48,21 @@ COLUMNS = [
 ]
 
 
+_SCALE_EPS = 1e-6
+
+
+def _rms_scale(psi: np.ndarray) -> np.ndarray:
+    """Per-frame RMS amplitude, floored so normalization never divides by ~0."""
+    return np.maximum(np.sqrt(np.mean(psi.reshape(len(psi), -1) ** 2, axis=1)), _SCALE_EPS)
+
+
 def fit_pca_subsample(files, pca_components: int, pca_frames: int) -> TargetPCA:
     subsample = []
     for path in files:
         row = F.read_parquet_row(path, columns=["efit_psirz"])
-        subsample.append(F._as_psirz_stack(row["efit_psirz"]))
+        psi = F._as_psirz_stack(row["efit_psirz"])
+        scale = _rms_scale(psi)
+        subsample.append(psi / scale[:, None, None])  # shape-only, amplitude normalized out
         if sum(len(p) for p in subsample) >= pca_frames:
             break
         del row
@@ -51,7 +71,7 @@ def fit_pca_subsample(files, pca_components: int, pca_frames: int) -> TargetPCA:
     n_components = min(pca_components, len(Y), 65 * 65)
     pca = TargetPCA(n_components=n_components)
     pca.fit(Y)
-    log(f"  ch2 PCA on {len(Y)} frames -> {n_components} comps, "
+    log(f"  ch2 PCA on {len(Y)} normalized-shape frames -> {n_components} comps, "
         f"{float(np.cumsum(pca.explained_variance_ratio)[-1]) * 100:.1f}% var")
     return pca
 
@@ -74,15 +94,17 @@ def main() -> int:
 
     pca = fit_pca_subsample(files, args.pca_components, args.pca_frames)
 
-    X_parts, Ypca_parts, scal_parts = [], [], []
+    X_parts, Ypca_parts, logscale_parts, scal_parts = [], [], [], []
     t0 = time.time()
     for i, path in enumerate(files):
         row = F.read_parquet_row(path, columns=COLUMNS)
         feat = F.synthetic_features_for_shot(row, "DIII-D")
         psi = F._as_psirz_stack(row["efit_psirz"])
         n = min(len(feat), len(psi))
+        scale = _rms_scale(psi[:n])
         X_parts.append(feat[:n].astype(np.float32))
-        Ypca_parts.append(pca.transform(psi[:n]))
+        Ypca_parts.append(pca.transform(psi[:n] / scale[:, None, None]))
+        logscale_parts.append(np.log(scale).astype(np.float32))
         scal_parts.append(
             np.column_stack([
                 np.asarray(row["efit_q95"], dtype=np.float32)[:n],
@@ -99,8 +121,9 @@ def main() -> int:
     from sklearn.linear_model import RidgeCV
     from sklearn.preprocessing import StandardScaler
 
-    X = np.concatenate(X_parts); Ypca = np.concatenate(Ypca_parts); S = np.concatenate(scal_parts)
-    del X_parts, Ypca_parts, scal_parts
+    X = np.concatenate(X_parts); Ypca = np.concatenate(Ypca_parts)
+    logscale = np.concatenate(logscale_parts); S = np.concatenate(scal_parts)
+    del X_parts, Ypca_parts, logscale_parts, scal_parts
     gc.collect()
     log(f"  {X.shape} frames x {X.shape[1]} shared features")
 
@@ -108,6 +131,11 @@ def main() -> int:
     Xs = np.asarray(scaler.transform(X), dtype=np.float32)
     model = RidgeCV(alphas=np.logspace(-3, 3, 10))
     model.fit(Xs, Ypca)
+
+    amp_model = RidgeCV(alphas=np.logspace(-3, 3, 10))
+    amp_model.fit(Xs, logscale)
+    log(f"  ch2 amplitude head fit on {len(logscale)} frames "
+        f"(log-scale R2 {amp_model.score(Xs, logscale):.3f})")
 
     scalar = RidgeCV(alphas=np.logspace(-3, 3, 10))
     ok = np.isfinite(S).all(axis=1)
@@ -123,6 +151,7 @@ def main() -> int:
         "scaler": scaler,
         "pca": pca,
         "model": model,
+        "amp_model": amp_model,
         "scalar": scalar,
         "meta": {
             "n_shots": len(files),
@@ -131,6 +160,7 @@ def main() -> int:
             "pca_components": int(pca.n_components),
             "seed": args.seed,
             "flux_r2": float(model.score(Xs, Ypca)),
+            "amp_r2": float(amp_model.score(Xs, logscale)),
         },
     }
     MODELS_DIR.mkdir(parents=True, exist_ok=True)

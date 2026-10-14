@@ -127,6 +127,16 @@ class Predictor:
 
     # -- Challenge 2 (MAST, zero-shot) -------------------------------------
 
+    # DIII-D's own training-data range (see 05_train_challenge2.py / features.py
+    # comment on the Ip unit fix) with a generous margin -- a linear RidgeCV
+    # transferred to MAST has no mechanism to saturate on out-of-distribution
+    # input, so a clamp is cheap insurance against a repeat of the ~1000x Ip
+    # unit mismatch that previously produced R2 in the hundreds-of-thousands
+    # negative range on MAST.
+    _CH2_PSI_CLAMP = (-1.5, 1.5)
+    _CH2_Q95_CLAMP = (0.0, 40.0)
+    _CH2_BETAN_CLAMP = (-1.0, 6.0)
+
     def challenge2_predict(self, row, source: str = "MAST") -> dict:
         """Shared Ip + Thomson pressure-proxy features fitted on DIII-D."""
         T = len(np.asarray(row["efit_times"]))
@@ -139,12 +149,21 @@ class Predictor:
         try:
             feat = synthetic_features_for_shot(row, source)
             Xs = np.asarray(self.ch2["scaler"].transform(feat), dtype=np.float32)
-            psirz = self.ch2["pca"].inverse_transform(self.ch2["model"].predict(Xs))
-            psirz = np.asarray(psirz, dtype=np.float32).reshape(T, 65, 65)
+            # shape (normalized-amplitude PCA basis) and amplitude are predicted by two
+            # separate heads -- see 05_train_challenge2.py's docstring for why that split
+            # transfers better zero-shot than fitting PCA on raw-scale DIII-D psi directly.
+            shape = self.ch2["pca"].inverse_transform(self.ch2["model"].predict(Xs))
+            shape = np.asarray(shape, dtype=np.float32).reshape(T, 65, 65)
+            if "amp_model" in self.ch2:
+                scale = np.exp(self.ch2["amp_model"].predict(Xs)).astype(np.float32)
+                psirz = shape * scale[:, None, None]
+            else:
+                psirz = shape
+            psirz = np.clip(psirz, *self._CH2_PSI_CLAMP)
             if self.ch2.get("scalar") is not None:
                 scal = self.ch2["scalar"].predict(Xs)
-                q95 = np.nan_to_num(scal[:, 0]).astype(np.float32)
-                beta_n = np.nan_to_num(scal[:, 1]).astype(np.float32)
+                q95 = np.clip(np.nan_to_num(scal[:, 0]), *self._CH2_Q95_CLAMP).astype(np.float32)
+                beta_n = np.clip(np.nan_to_num(scal[:, 1]), *self._CH2_BETAN_CLAMP).astype(np.float32)
             else:
                 q95 = np.zeros(T, dtype=np.float32)
                 beta_n = np.zeros(T, dtype=np.float32)

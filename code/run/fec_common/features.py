@@ -269,12 +269,21 @@ def synthetic_features_for_shot(row: dict, source: str) -> np.ndarray:
     efit_times = np.asarray(row["efit_times"], dtype=np.float64)
     T = len(efit_times)
 
+    # NOTE: empirically both machines' magnetics_plasma_current is already in kA (DIII-D
+    # shots top out ~1000-1700, i.e. ~1-1.7 MA; MAST shots top out ~400-1000, i.e. the
+    # expected MAST current range) -- despite the starter-kit docs describing DIII-D
+    # currents as amps elsewhere. A previous version of this function assumed DIII-D was
+    # already in A (no conversion) and multiplied MAST by 1000 assuming kA->A, which
+    # introduced a spurious ~1000x scale mismatch between the two machines' dominant
+    # shared feature and broke the Challenge-2 RidgeCV transfer (catastrophic negative
+    # R2 on MAST from linear extrapolation on out-of-distribution z-scores). Verified by
+    # comparing raw min/max across both machines before changing this.
     if source == "DIII-D":
         ip_times = fix_d3d_ip_times(row)
-        ip = np.asarray(row["magnetics_plasma_current"], dtype=np.float64)  # already A
+        ip = np.asarray(row["magnetics_plasma_current"], dtype=np.float64)
     else:
         ip_times = np.asarray(row["magnetics_time"], dtype=np.float64)
-        ip = np.asarray(row["magnetics_plasma_current"], dtype=np.float64) * 1000.0  # kA -> A
+        ip = np.asarray(row["magnetics_plasma_current"], dtype=np.float64)
         ok = np.isfinite(ip_times) & np.isfinite(ip)
         ip_times, ip = ip_times[ok], ip[ok]
     f_ip = interp1d(ip_times, ip, kind="linear", fill_value="extrapolate", bounds_error=False)

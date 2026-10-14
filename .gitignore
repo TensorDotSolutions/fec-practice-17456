@@ -23,3 +23,4 @@ __pycache__/
 
 # Internal AI-assistant instructions, not meant for the public repo
 /CLAUDE.md
+/.claude/
