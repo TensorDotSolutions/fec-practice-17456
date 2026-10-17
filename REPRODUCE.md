@@ -121,7 +121,7 @@ No other external datasets or pre-trained models were used.
 ## Disclosures (rule 3 / rule 4)
 
 - **Development-phase score comparison**: the Challenge-2 model variant that was ultimately
-  submitted was chosen by comparing this team's own Development-phase S_MAST scores across
+  submitted was chosen by comparing my own Development-phase S_MAST scores across
   two of its own prior submissions (0.0276 → 0.0575, after fixing a plasma-current unit bug),
   per rule 3's explicit permission to use the platform's own feedback for pipeline selection.
   No MAST equilibrium data was used to produce either candidate or to make this comparison.
