@@ -233,6 +233,83 @@ def psi_loss_v2(psi_pred, psi_true, q95_pred, q95_true, betan_pred, betan_true,
     return mse + grad_weight * grad + boundary_weight * boundary + scalar_weight * scal
 
 
+# ---------------------------------------------------------------------------
+# Challenge-2 (MAST zero-shot) conv model -- takes the 5-channel SPATIAL image stack from
+# ch2_features.build_ch2_images (vacuum-field map, R/Z coordconv, core-pressure profile,
+# Ip broadcast) instead of a machine-specific flat feature vector, so the same input
+# representation and the same trained weights apply unchanged to both machines. See
+# ch2_features.py's module docstring for why: the flat-vector RidgeCV approach
+# (05_train_challenge2.py) tops out at flux R2 ~0.06-0.08 in-sample on DIII-D and leaves
+# MAST's Consistency term at 0.0 -- it has no way to represent 2-D spatial structure at
+# all. This gives a conv net the same image-shaped input/output contract as
+# PsiConvDecoderV2 already uses successfully for Challenge 1, but built from inputs that
+# are genuinely comparable across machines instead of DIII-D's own 149-wide raw channel
+# layout.
+#
+# Trains on the RESIDUAL (true psi - vacuum_scale * vacuum_psi, see
+# train_ch2_conv_colab.py), predicting a normalized shape map plus a separate amplitude
+# scalar -- same shape/amplitude split rationale as 05_train_challenge2.py's docstring,
+# just with a conv net in place of PCA+Ridge for the shape half.
+#
+# No downsampling: the input is already a 65x65 image (not a flat vector needing a
+# learned upsample from a bottleneck), so this stays at full resolution throughout --
+# simpler than fighting the odd grid size (65 doesn't halve evenly) through a U-Net, and
+# the whole-grid field of view that a plasma-physics problem needs is already present in
+# every layer, not reconstructed from a compressed bottleneck.
+
+class Ch2PhysConvNet(nn.Module):
+    def __init__(self, in_channels: int = 5, width: int = 64, n_blocks: int = 6,
+                aux_dim: int = 3, dropout: float = 0.1):
+        super().__init__()
+        self.stem = nn.Sequential(
+            nn.Conv2d(in_channels, width, kernel_size=3, padding=1),
+            nn.BatchNorm2d(width), nn.ReLU(inplace=True),
+        )
+        self.blocks = nn.ModuleList([_CoordConvResBlock(width) for _ in range(n_blocks)])
+        self.shape_head = nn.Conv2d(width, 1, kernel_size=1)
+
+        pooled_dim = width + aux_dim
+        self.q95_head = nn.Sequential(
+            nn.Linear(pooled_dim, 64), nn.ReLU(inplace=True), nn.Dropout(dropout),
+            nn.Linear(64, 1))
+        self.betan_head = nn.Sequential(
+            nn.Linear(pooled_dim, 64), nn.ReLU(inplace=True), nn.Linear(64, 1))
+
+    def forward(self, images: torch.Tensor, aux: torch.Tensor
+               ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """images: (B, 5, 65, 65), aux: (B, 3) -- see ch2_features.build_ch2_images.
+
+        Returns ``(shape, q95, betan)``. ``shape`` (B, 65, 65) is ``psi / sigma_physics``
+        laid out [iZ, iR] -- a SIGMA-NORMALIZED but NOT mean-subtracted map, because psi
+        carries a real DC offset (|mean|/std ~ 0.8 on DIII-D) that R2 is scored against and
+        that does not follow the Ip*R0 law (R2 0.03), so the net must carry it.
+
+        There is deliberately NO amplitude head: absolute amplitude comes from
+        ``ch2_features.physics_sigma`` instead. The previous learned log-amplitude head had
+        to extrapolate a DIII-D-fit input distribution onto MAST and overshot ~7x, which is
+        what drove the scored R2_psi to -25.9 (vs 0.0 for simply predicting a constant).
+        """
+        h = self.stem(images)
+        for block in self.blocks:
+            h = block(h)
+        shape = self.shape_head(h).squeeze(1)  # (B, 65, 65)
+
+        pooled = torch.cat([h.mean(dim=(2, 3)), aux], dim=1)  # (B, width + aux_dim)
+        q95 = self.q95_head(pooled).squeeze(-1)
+        beta_n = self.betan_head(pooled).squeeze(-1)
+        return shape, q95, beta_n
+
+
+def ch2_loss(shape_pred, shape_true, q95_pred, q95_true, betan_pred, betan_true,
+            scalar_weight: float = 0.05, grad_weight: float = 0.1,
+            boundary_weight: float = 0.3) -> torch.Tensor:
+    mse = F.mse_loss(shape_pred, shape_true)
+    grad = sobel_gradient_loss(shape_pred, shape_true)
+    boundary = boundary_weighted_mse(shape_pred, shape_true)
+    scal = F.mse_loss(q95_pred, q95_true) + F.mse_loss(betan_pred, betan_true)
+    return mse + grad_weight * grad + boundary_weight * boundary + scalar_weight * scal
+
+
 if __name__ == "__main__":
     # Smoke test only -- run this cell in Colab (needs torch) before training for real.
     m = PsiConvDecoder(n_feat=149)
@@ -248,3 +325,15 @@ if __name__ == "__main__":
     loss = psi_loss_v2(psi2, psi, q95_2, q95, beta_n2, beta_n)
     assert torch.isfinite(loss)
     print(f"V2 params: {count_params(m2):,}  psi {psi2.shape}  loss {loss.item():.4f}")
+
+    m3 = Ch2PhysConvNet()
+    images = torch.randn(8, 5, 65, 65)
+    aux = torch.randn(8, 2)
+    shape, log_amp, q95_3, beta_n3 = m3(images, aux)
+    assert shape.shape == (8, 65, 65), shape.shape
+    assert log_amp.shape == (8,) and q95_3.shape == (8,) and beta_n3.shape == (8,)
+    loss3 = ch2_loss(shape, psi2.detach(), log_amp, log_amp.detach() + 0.1,
+                     q95_3, q95_2.detach(), beta_n3, beta_n2.detach())
+    assert torch.isfinite(loss3)
+    print(f"Ch2PhysConvNet params: {count_params(m3):,}  shape {shape.shape}  "
+         f"loss {loss3.item():.4f}")
